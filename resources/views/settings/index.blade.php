@@ -136,6 +136,46 @@
         </form>
     </x-card>
 
+    {{-- Tu acceso --}}
+    <x-card class="space-y-3">
+        <div>
+            <h2 class="font-semibold">Tu acceso</h2>
+            <p class="text-xs text-slate-500">Cambia tu nombre, correo o contraseña. Deja la contraseña nueva vacía si no quieres cambiarla.</p>
+        </div>
+        <form method="POST" action="{{ route('users.me') }}" class="grid gap-3 sm:grid-cols-2">
+            @csrf
+            @method('PUT')
+            @if ($errors->me->any())
+                <ul class="rounded-lg bg-rose-50 p-2 text-sm text-rose-700 sm:col-span-2">
+                    @foreach ($errors->me->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            @endif
+            <div>
+                <label class="label" for="me_name">Nombre</label>
+                <input id="me_name" name="name" type="text" class="input" value="{{ $errors->me->any() ? old('name') : auth()->user()->name }}" required maxlength="255">
+            </div>
+            <div>
+                <label class="label" for="me_email">Correo</label>
+                <input id="me_email" name="email" type="email" class="input" value="{{ $errors->me->any() ? old('email') : auth()->user()->email }}" required autocomplete="username">
+            </div>
+            <div>
+                <label class="label" for="me_password">Contraseña nueva</label>
+                <input id="me_password" name="password" type="password" class="input" autocomplete="new-password" placeholder="Opcional">
+            </div>
+            <div>
+                <label class="label" for="me_password_confirmation">Repítela</label>
+                <input id="me_password_confirmation" name="password_confirmation" type="password" class="input" autocomplete="new-password">
+            </div>
+            <div class="sm:col-span-2">
+                <label class="label" for="me_current">Contraseña actual</label>
+                <input id="me_current" name="current_password" type="password" class="input" required autocomplete="current-password">
+            </div>
+            <button type="submit" class="btn-primary sm:col-span-2">Guardar acceso</button>
+        </form>
+    </x-card>
+
     {{-- Usuarios --}}
     <x-card class="space-y-3" x-data="{ adding: @js($errors->newUser->any()) }">
         <div class="flex items-center justify-between">

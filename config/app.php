@@ -123,4 +123,13 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    | Usuario dueño que crea el DemoSeeder. La contraseña vive solo en .env.
+    */
+    'owner' => [
+        'name' => env('OWNER_NAME', 'Jhan'),
+        'email' => env('OWNER_EMAIL', 'gcjhan2001@gmail.com'),
+        'password' => env('OWNER_PASSWORD'),
+    ],
+
 ];

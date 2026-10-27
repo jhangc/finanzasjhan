@@ -79,3 +79,23 @@ it('rejects a duplicate email when creating another user', function () {
         'password_confirmation' => 'secreto-largo-123',
     ])->assertSessionHasErrorsIn('newUser', 'email');
 });
+
+it('lets a user change their own email and password with the current password', function () {
+    $me = User::factory()->create(['password' => 'vieja-clave-123']);
+
+    $this->actingAs($me)->from(route('settings'))->put(route('users.me'), [
+        'name' => 'Jhan', 'email' => 'nuevo@example.com',
+        'password' => 'nueva-clave-123', 'password_confirmation' => 'nueva-clave-123',
+        'current_password' => 'mal',
+    ])->assertSessionHasErrorsIn('me', 'current_password');
+
+    $this->put(route('users.me'), [
+        'name' => 'Jhan', 'email' => 'nuevo@example.com',
+        'password' => 'nueva-clave-123', 'password_confirmation' => 'nueva-clave-123',
+        'current_password' => 'vieja-clave-123',
+    ])->assertRedirect(route('settings'));
+
+    $me->refresh();
+    expect($me->email)->toBe('nuevo@example.com')
+        ->and(Illuminate\Support\Facades\Hash::check('nueva-clave-123', $me->password))->toBeTrue();
+});

@@ -50,6 +50,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/settings', [SettingsController::class, 'edit'])->name('settings');
     Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
     Route::post('/users', [UserController::class, 'store'])->name('users.store');
+    Route::put('/me', [UserController::class, 'updateMe'])->name('users.me');
 
     // Los sobres se editan en "Armar el mes" y el resto en sus pantallas, sin formularios aparte.
     Route::post('/envelopes/batch', [EnvelopeController::class, 'batch'])->name('envelopes.batch');
