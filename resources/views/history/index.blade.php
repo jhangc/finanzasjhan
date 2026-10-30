@@ -144,6 +144,7 @@
                             <x-field label="Nota">
                                 <input name="note" type="text" class="input" value="{{ $model->note }}" maxlength="255">
                             </x-field>
+                            <x-payment-source :payment="$model" class="col-span-2" />
                             <x-voucher-input :payment="$model" class="col-span-2" />
                             <button type="submit" class="btn-primary col-span-2">Guardar</button>
                         </form>

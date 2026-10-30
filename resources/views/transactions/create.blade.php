@@ -17,12 +17,17 @@
           source: @js(old('source', '')),
           incomeAccount: @js((string) old('income_account', '')),
           incomeSource: @js(old('income_source', '')),
+          incomeFrom: @js(old('income_from', '')),
           targets: @js($allTargets),
           sources: @js($allSources),
           get targetOption() { return this.targets[this.target] ?? null; },
           get sourceOption() { return this.sources[this.source] ?? null; },
           get isCommitment() { return this.target.startsWith('commitment:'); },
           get payingCard() { return this.targetOption?.is_card ?? false; },
+          pickIncomeAccount(id) {
+              this.incomeAccount = id;
+              if (this.incomeFrom === 'account:' + id) this.incomeFrom = '';
+          },
           pickTarget(value) {
               this.target = value;
               const suggested = this.targets[value]?.suggested;
@@ -218,7 +223,7 @@
                         <input type="hidden" name="income_account" :value="kind === 'income' ? incomeAccount : ''">
                         <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                             @foreach ($accounts as $option)
-                                <button type="button" @click="incomeAccount = @js((string) $option['id'])"
+                                <button type="button" @click="pickIncomeAccount(@js((string) $option['id']))"
                                         class="flex items-center gap-3 rounded-xl p-3 text-left transition"
                                         :class="incomeAccount === @js((string) $option['id']) ? 'bg-emerald-50 ring-2 ring-emerald-500' : 'bg-white ring-1 ring-slate-200 hover:bg-slate-50'">
                                     <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700"><x-icon name="wallet" class="h-4 w-4" /></span>
@@ -233,6 +238,40 @@
                                 Ninguna / en mano
                             </button>
                         </div>
+                    </div>
+                    <div>
+                        <span class="label">¿Sale de otra cuenta o tarjeta? <span class="font-normal normal-case text-slate-400">(opcional)</span></span>
+                        <p class="mb-2 text-xs text-slate-500">Si pasas plata de tu tarjeta o de otra cuenta tuya, elige de dónde sale: se registra como <strong>movimiento</strong>, se descuenta de ahí (o sube la deuda de la tarjeta) y no cuenta como ingreso del mes.</p>
+                        <input type="hidden" name="income_from" :value="kind === 'income' ? incomeFrom : ''">
+                        <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                            <button type="button" @click="incomeFrom = ''" class="rounded-xl p-3 text-left text-sm transition"
+                                    :class="incomeFrom === '' ? 'bg-slate-100 ring-2 ring-slate-400' : 'ring-1 ring-slate-200 text-slate-500 hover:bg-slate-50'">
+                                De fuera (no sale de mis cuentas)
+                            </button>
+                            @foreach ($accounts as $option)
+                                <button type="button" @click="incomeFrom = @js($option['value'])" :disabled="incomeAccount === @js((string) $option['id'])"
+                                        class="flex items-center gap-3 rounded-xl p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-40"
+                                        :class="incomeFrom === @js($option['value']) ? 'bg-rose-50 ring-2 ring-rose-500' : 'bg-white ring-1 ring-slate-200 hover:bg-slate-50'">
+                                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700"><x-icon name="wallet" class="h-4 w-4" /></span>
+                                    <span class="min-w-0">
+                                        <span class="block truncate text-sm font-semibold">{{ $option['name'] }}</span>
+                                        <span class="block truncate text-xs text-slate-500">{{ $option['hint'] }}</span>
+                                    </span>
+                                </button>
+                            @endforeach
+                            @foreach ($cards as $option)
+                                <button type="button" @click="incomeFrom = @js($option['value'])"
+                                        class="flex items-center gap-3 rounded-xl p-3 text-left transition"
+                                        :class="incomeFrom === @js($option['value']) ? 'bg-rose-50 ring-2 ring-rose-500' : 'bg-white ring-1 ring-slate-200 hover:bg-slate-50'">
+                                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700"><x-icon name="card" class="h-4 w-4" /></span>
+                                    <span class="min-w-0">
+                                        <span class="block truncate text-sm font-semibold">{{ $option['name'] }}</span>
+                                        <span class="block truncate text-xs text-slate-500">{{ $option['hint'] }}</span>
+                                    </span>
+                                </button>
+                            @endforeach
+                        </div>
+                        @error('income_from')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
                     </div>
                 </div>
             </x-card>
@@ -250,10 +289,10 @@
         {{-- Resumen --}}
         <aside class="space-y-4 lg:sticky lg:top-8">
             <section class="rounded-3xl bg-ink-900 p-6 text-white shadow-soft">
-                <p class="text-xs font-semibold uppercase tracking-widest text-slate-400" x-text="kind === 'expense' ? 'Vas a registrar' : 'Vas a recibir'"></p>
+                <p class="text-xs font-semibold uppercase tracking-widest text-slate-400" x-text="kind === 'expense' ? 'Vas a registrar' : (incomeFrom ? 'Vas a mover' : 'Vas a recibir')"></p>
                 <p class="mt-2 text-4xl font-extrabold tracking-tight tabular-nums"
                    :class="kind === 'expense' ? 'text-rose-300' : 'text-emerald-300'"
-                   x-text="(kind === 'expense' ? '− ' : '+ ') + fc.money(amount || '0')"></p>
+                   x-text="(kind === 'expense' ? '− ' : (incomeFrom ? '⇄ ' : '+ ')) + fc.money(amount || '0')"></p>
 
                 <dl class="mt-5 space-y-3 text-sm" x-show="kind === 'expense'">
                     <div>
@@ -284,13 +323,25 @@
                         <dt class="text-xs text-slate-400">Entra a</dt>
                         <dd class="font-semibold" x-text="sources['account:' + incomeAccount]?.name ?? 'Ninguna cuenta'"></dd>
                     </div>
+                    <template x-if="incomeFrom">
+                        <div>
+                            <dt class="text-xs text-slate-400">Sale de</dt>
+                            <dd class="font-semibold text-rose-300" x-text="sources[incomeFrom]?.name"></dd>
+                        </div>
+                    </template>
+                    <template x-if="incomeFrom.startsWith('card:')">
+                        <p class="rounded-xl bg-amber-400/15 p-3 text-xs text-amber-100">Se suma a la deuda de la tarjeta.</p>
+                    </template>
+                    <template x-if="incomeFrom">
+                        <p class="rounded-xl bg-white/5 p-3 text-xs text-slate-300">Es un movimiento entre tus cuentas: no suma como ingreso del mes.</p>
+                    </template>
                 </dl>
             </section>
 
             <button type="submit" class="btn w-full py-3.5 text-base text-white"
                     :class="kind === 'expense' ? 'bg-rose-500 hover:bg-rose-400' : 'bg-emerald-600 hover:bg-emerald-500'"
-                    :disabled="!fc.toCents(amount) || (kind === 'expense' && (!target || !source)) || (kind === 'income' && !incomeSource.trim())"
-                    x-text="kind === 'expense' ? 'Registrar gasto' : 'Registrar ingreso'"></button>
+                    :disabled="!fc.toCents(amount) || (kind === 'expense' && (!target || !source)) || (kind === 'income' && !incomeFrom && !incomeSource.trim())"
+                    x-text="kind === 'expense' ? 'Registrar gasto' : (incomeFrom ? 'Registrar movimiento' : 'Registrar ingreso')"></button>
         </aside>
     </div>
 </form>

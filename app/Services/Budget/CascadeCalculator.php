@@ -74,7 +74,7 @@ class CascadeCalculator
      */
     private function income(Period $period): array
     {
-        $confirmed = $period->incomes()->where('confirmed', true)->get(['amount', 'currency']);
+        $confirmed = $period->incomes()->earned()->where('confirmed', true)->get(['amount', 'currency']);
 
         if ($confirmed->isEmpty()) {
             return ['amount' => Money::of($period->expected_income), 'confirmed' => false];

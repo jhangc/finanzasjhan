@@ -81,7 +81,7 @@
 
                     <div class="mt-auto flex gap-2 pt-4">
                         <button type="button" class="btn-primary flex-1"
-                                @click="paying = @js(['id' => $c->id, 'name' => $c->name, 'amount' => \App\Support\Money::of(\App\Support\Money::isZero($item['pending']) ? $item['monthly'] : $item['pending'])])">
+                                @click="paying = @js(['id' => $c->id, 'name' => $c->name, 'is_card' => $c->is_card, 'amount' => \App\Support\Money::of(\App\Support\Money::isZero($item['pending']) ? $item['monthly'] : $item['pending'])])">
                             Registrar pago
                         </button>
                         <a href="{{ route('commitments.show', $c) }}" class="btn-secondary">Detalle</a>

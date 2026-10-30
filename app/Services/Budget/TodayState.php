@@ -72,6 +72,26 @@ class TodayState
             ],
             'recent' => $this->recent($period, $today),
             'sources' => $this->sources($period->user),
+            'money' => $this->money($period->user, $cascade->daysLeft),
+        ];
+    }
+
+    /** Lo que tienes hoy en tus cuentas (USD en soles) y cuánto toca por día hasta fin de mes. */
+    private function money(User $user, int $daysLeft): array
+    {
+        $accounts = Account::ownedBy($user)->get(['balance', 'currency']);
+        $rate = $user->usd_rate;
+
+        $total = Money::sum($accounts->map(fn (Account $a) => match (true) {
+            $a->currency !== 'USD' => Money::of($a->balance),
+            $rate !== null => Money::mul($a->balance, $rate),
+            default => '0.00',
+        }));
+
+        return [
+            'hasAccounts' => $accounts->isNotEmpty(),
+            'total' => $total,
+            'perDay' => Money::div($total, (string) max(1, $daysLeft)),
         ];
     }
 

@@ -8,6 +8,7 @@ use App\Models\Envelope;
 use App\Services\Debts\VoucherStorage;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 /**
@@ -15,6 +16,7 @@ use Illuminate\Validation\Validator;
  *
  * target: "envelope:ID" (categoría) | "commitment:ID" (gasto fijo, préstamo o tarjeta)
  * source: "account:ID" | "card:ID" | "none"
+ * income_from (opcional): "account:ID" | "card:ID" — de dónde sale el dinero que entra
  */
 class RegisterTransactionRequest extends BaseRequest
 {
@@ -26,6 +28,11 @@ class RegisterTransactionRequest extends BaseRequest
 
     public ?Commitment $card = null;
 
+    /** Ingreso: cuenta o tarjeta de la que sale el dinero. */
+    public ?Account $fromAccount = null;
+
+    public ?Commitment $fromCard = null;
+
     public function rules(): array
     {
         return [
@@ -35,8 +42,10 @@ class RegisterTransactionRequest extends BaseRequest
             'note' => ['nullable', 'string', 'max:255'],
             'target' => ['required_if:kind,expense', 'nullable', 'regex:/^(envelope|commitment):\d+$/'],
             'source' => ['required_if:kind,expense', 'nullable', 'regex:/^(account:\d+|card:\d+|none)$/'],
-            'income_source' => ['required_if:kind,income', 'nullable', 'string', 'max:100'],
+            // En un movimiento entre cuentas el "de dónde viene" es opcional.
+            'income_source' => [Rule::requiredIf($this->input('kind') === 'income' && ! $this->filled('income_from')), 'nullable', 'string', 'max:100'],
             'income_account' => ['nullable', 'integer', $this->owned('accounts')],
+            'income_from' => ['nullable', 'regex:/^(account|card):\d+$/'],
             'vouchers' => ['nullable', 'array', 'max:'.VoucherStorage::MAX_PER_PAYMENT],
             'vouchers.*' => VoucherStorage::FILE_RULES,
         ];
@@ -49,6 +58,7 @@ class RegisterTransactionRequest extends BaseRequest
             'source' => 'con qué pagas',
             'income_source' => 'de dónde viene',
             'income_account' => 'cuenta',
+            'income_from' => 'de qué cuenta sale',
             'date' => 'fecha',
         ] + parent::attributes();
     }
@@ -58,7 +68,7 @@ class RegisterTransactionRequest extends BaseRequest
         return [
             'target.required_if' => 'Elige qué estás pagando.',
             'source.required_if' => 'Elige con qué pagas.',
-            'income_source.required_if' => 'Escribe de dónde viene el ingreso.',
+            'income_source.required' => 'Escribe de dónde viene el ingreso.',
         ];
     }
 
@@ -76,7 +86,13 @@ class RegisterTransactionRequest extends BaseRequest
     /** Convierte "envelope:5" / "account:2" en modelos del usuario y valida la combinación. */
     private function resolveSelections(Validator $validator): void
     {
-        if ($validator->errors()->isNotEmpty() || $this->input('kind') !== 'expense') {
+        if ($validator->errors()->isNotEmpty()) {
+            return;
+        }
+
+        if ($this->input('kind') === 'income') {
+            $this->resolveIncomeFrom($validator);
+
             return;
         }
 
@@ -125,6 +141,33 @@ class RegisterTransactionRequest extends BaseRequest
             $validator->errors()->add('source', 'Esa tarjeta no existe.');
         } elseif ($this->commitment?->is_card) {
             $validator->errors()->add('source', 'Una tarjeta se paga desde una cuenta, no con otra tarjeta.');
+        }
+    }
+
+    /** Ingreso que sale de otra cuenta propia o de una tarjeta. */
+    private function resolveIncomeFrom(Validator $validator): void
+    {
+        if (! $this->filled('income_from')) {
+            return;
+        }
+
+        $user = $this->user();
+        [$type, $id] = explode(':', $this->input('income_from'));
+
+        if ($type === 'card') {
+            $this->fromCard = Commitment::ownedBy($user)->where('is_card', true)->find($id);
+            if (! $this->fromCard) {
+                $validator->errors()->add('income_from', 'Esa tarjeta no existe.');
+            }
+
+            return;
+        }
+
+        $this->fromAccount = Account::ownedBy($user)->find($id);
+        if (! $this->fromAccount) {
+            $validator->errors()->add('income_from', 'Esa cuenta no existe.');
+        } elseif ((int) $id === $this->integer('income_account')) {
+            $validator->errors()->add('income_from', 'La cuenta de origen y la de destino no pueden ser la misma.');
         }
     }
 }

@@ -1,4 +1,4 @@
-{{-- Modal "registrar pago". Requiere en el x-data padre: paying (null | {id, name, amount}) --}}
+{{-- Modal "registrar pago". Requiere en el x-data padre: paying (null | {id, name, amount, is_card}) --}}
 <x-modal show="paying" title="Registrar pago" size="max-w-md">
     <form method="POST" action="{{ route('commitment-payments.store') }}" enctype="multipart/form-data" class="space-y-3">
         @csrf
@@ -12,6 +12,7 @@
                 <input name="paid_at" type="date" class="input" value="{{ now()->toDateString() }}" required>
             </x-field>
         </div>
+        <x-payment-source cards-disabled="paying?.is_card" />
         <x-field label="Nota (opcional)">
             <input name="note" type="text" class="input" maxlength="255" placeholder="N.º de operación, banco…">
         </x-field>

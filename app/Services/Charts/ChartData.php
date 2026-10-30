@@ -52,7 +52,7 @@ class ChartData
 
         $ids = $periods->pluck('id');
 
-        $confirmed = Income::whereIn('period_id', $ids)->where('confirmed', true)
+        $confirmed = Income::earned()->whereIn('period_id', $ids)->where('confirmed', true)
             ->selectRaw('period_id, currency, SUM(amount) as total')->groupBy('period_id', 'currency')->get()
             ->groupBy('period_id');
 

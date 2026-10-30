@@ -136,3 +136,15 @@ it('lists fixed payments among the latest expenses and in the chart total', func
 
     $this->actingAs($this->user)->get('/')->assertSee('Gastos de categorías y pagos fijos del mes');
 });
+
+it('shows the money left in your accounts', function () {
+    makePeriod($this->user, ['year' => 2026, 'month' => 10], []);
+    $this->user->update(['usd_rate' => '3.500']);
+    \App\Models\Account::factory()->for($this->user)->create(['balance' => '106.93', 'currency' => 'PEN']);
+    \App\Models\Account::factory()->for($this->user)->create(['balance' => '10.00', 'currency' => 'USD']);
+
+    $this->actingAs($this->user)->get('/')
+        ->assertOk()
+        ->assertSee('Te queda en tus cuentas')
+        ->assertSee('S/ 141.93');
+});

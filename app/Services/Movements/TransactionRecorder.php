@@ -16,7 +16,9 @@ use Illuminate\Support\Facades\DB;
  * Registra lo que se anota en la pantalla "Anotar":
  * - gasto de una categoría → movimiento (baja la cuenta o sube la tarjeta),
  * - pago de un gasto fijo, préstamo o tarjeta → pago (baja la deuda y la cuenta, o sube la tarjeta usada),
- * - ingreso → ingreso recibido (sube la cuenta).
+ * - ingreso → ingreso recibido (sube la cuenta),
+ * - movimiento → ingreso con origen: sube la cuenta destino y baja la de origen (o sube la deuda de la tarjeta);
+ *   no cuenta como ingreso del mes.
  * Los saldos los mueven los observers.
  */
 class TransactionRecorder
@@ -83,12 +85,21 @@ class TransactionRecorder
             'period_id' => $this->periods->generate($user, $date->year, $date->month)->id,
             'amount' => $amount,
             'currency' => $account?->currency ?? 'PEN',
-            'source' => $request->input('income_source'),
+            'source' => $request->input('income_source') ?: 'Movimiento entre cuentas',
             'received_at' => $date->toDateString(),
             'confirmed' => true,
             'account_id' => $account?->id,
+            'from_account_id' => $request->fromAccount?->id,
+            'from_commitment_id' => $request->fromCard?->id,
         ]);
 
-        return 'Ingreso de '.Money::format($amount, $account?->currency ?? 'PEN').($account ? " en {$account->name}" : '').'.';
+        $money = Money::format($amount, $account?->currency ?? 'PEN');
+        $from = $request->fromAccount?->name ?? $request->fromCard?->name;
+
+        if ($from) {
+            return "Movimiento de {$money} desde {$from}".($account ? " a {$account->name}" : '').'.';
+        }
+
+        return "Ingreso de {$money}".($account ? " en {$account->name}" : '').'.';
     }
 }

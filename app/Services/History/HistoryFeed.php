@@ -9,11 +9,11 @@ use App\Models\Period;
 use Illuminate\Support\Collection;
 
 /**
- * Lista unificada del mes: gastos, ingresos y pagos.
+ * Lista unificada del mes: gastos, ingresos, movimientos entre cuentas y pagos.
  */
 class HistoryFeed
 {
-    public const TYPES = ['movement' => 'Gastos', 'income' => 'Ingresos', 'payment' => 'Pagos'];
+    public const TYPES = ['movement' => 'Gastos', 'income' => 'Ingresos', 'transfer' => 'Movimientos', 'payment' => 'Pagos'];
 
     /**
      * @return Collection<int, array>
@@ -40,17 +40,29 @@ class HistoryFeed
             );
         }
 
-        if ($type === null || $type === 'income') {
+        // Los movimientos entre cuentas se guardan como ingresos con origen.
+        if (in_array($type, [null, 'income', 'transfer'], true)) {
+            $incomes = $period->incomes()->with(['account:id,name', 'fromAccount:id,name', 'fromCard:id,name']);
+            match ($type) {
+                'income' => $incomes->earned(),
+                'transfer' => $incomes->transfers(),
+                default => null,
+            };
+
             $items = $items->concat(
-                $period->incomes()->with('account:id,name')->get()->map(fn (Income $i) => [
+                $incomes->get()->map(fn (Income $i) => [
                     'type' => 'income',
                     'id' => $i->id,
                     'date' => $i->received_at,
                     'title' => $i->source,
-                    'subtitle' => collect([$i->confirmed ? 'Recibido' : 'Esperado', $i->account ? 'en '.$i->account->name : null])->filter()->join(' · '),
+                    'subtitle' => collect([
+                        $i->confirmed ? 'Recibido' : 'Esperado',
+                        ($i->fromAccount ?? $i->fromCard) ? 'desde '.($i->fromAccount ?? $i->fromCard)->name : null,
+                        $i->account ? 'en '.$i->account->name : null,
+                    ])->filter()->join(' · '),
                     'amount' => $i->amount,
                     'currency' => $i->currency,
-                    'sign' => '+',
+                    'sign' => $i->isTransfer() ? '⇄ ' : '+',
                     'model' => $i,
                 ])
             );

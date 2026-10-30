@@ -48,7 +48,18 @@
 
             <div class="relative">
                 <div class="flex items-start justify-between gap-4">
-                    <div>
+                    <div x-show="state.money.hasAccounts" @if (! $state['money']['hasAccounts']) x-cloak @endif>
+                        <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">Te queda en tus cuentas</p>
+                        <p class="mt-2 text-5xl font-extrabold tracking-tight tabular-nums sm:text-6xl"
+                           :class="negative() ? 'text-rose-300' : 'text-white'"
+                           x-text="fc.money(state.money.total)">{{ \App\Support\Money::format($state['money']['total']) }}</p>
+                        <p class="mt-2 text-sm text-slate-400">
+                            Puedes gastar hoy <span class="font-semibold text-white tabular-nums" x-text="fc.money(state.money.perDay)"></span>
+                            · quedan <span class="font-semibold text-white" x-text="state.cascade.daysLeft"></span>
+                            <span x-text="state.cascade.daysLeft === 1 ? 'día' : 'días'"></span>
+                        </p>
+                    </div>
+                    <div x-show="!state.money.hasAccounts" @if ($state['money']['hasAccounts']) x-cloak @endif>
                         <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">Puedes gastar hoy</p>
                         <p class="mt-2 text-5xl font-extrabold tracking-tight tabular-nums sm:text-6xl"
                            :class="negative() ? 'text-rose-300' : 'text-white'"
@@ -65,7 +76,7 @@
                 </div>
 
                 {{-- Avance del gasto del mes --}}
-                <div class="mt-6">
+                <div class="mt-6" x-show="cents(state.cascade.allocated) > 0">
                     <div class="mb-1.5 flex justify-between text-xs text-slate-400">
                         <span>Gastado <b class="text-white tabular-nums" x-text="fc.money(state.cascade.spent)"></b> de <span class="tabular-nums" x-text="fc.money(state.cascade.allocated)"></span></span>
                         <span x-text="spentPercent() + '%'"></span>
@@ -376,7 +387,9 @@
                 },
 
                 cents(value) { return fc.toCents(value); },
-                negative() { return this.cents(this.state.cascade.todayAllowance) < 0; },
+                negative() {
+                    return this.cents(this.state.money.hasAccounts ? this.state.money.total : this.state.cascade.todayAllowance) < 0;
+                },
 
                 spentPercent() {
                     const allocated = this.cents(this.state.cascade.allocated);

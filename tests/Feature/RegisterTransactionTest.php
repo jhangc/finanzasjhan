@@ -6,6 +6,7 @@ use App\Models\CommitmentPayment;
 use App\Models\Income;
 use App\Models\Movement;
 use App\Models\User;
+use App\Services\Budget\CascadeCalculator;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
@@ -124,6 +125,32 @@ it('records an income into an account', function () {
     expect($this->bcp->fresh()->balance)->toBe('3000.00');
 });
 
+it('records a movement between accounts or from a card without counting it as income', function () {
+    $income = fn (array $data) => $this->actingAs($this->user)->post(route('transactions.store'), $data + [
+        'kind' => 'income', 'amount' => '300', 'date' => '2026-10-27', 'income_source' => 'Transferencia', 'income_account' => $this->bcp->id,
+    ]);
+
+    $income(['income_from' => "account:{$this->cash->id}", 'income_source' => ''])
+        ->assertSessionHas('status', '✓ Movimiento de S/ 300.00 desde Efectivo a BCP Sueldo.');
+    expect(Income::first()->source)->toBe('Movimiento entre cuentas')
+        ->and(Income::earned()->count())->toBe(0)
+        ->and(app(CascadeCalculator::class)->for($this->period->fresh())->incomeIsConfirmed)->toBeFalse();
+    expect($this->bcp->fresh()->balance)->toBe('3300.00')
+        ->and($this->cash->fresh()->balance)->toBe('-100.00');
+
+    $income(['income_from' => "card:{$this->visa->id}"])->assertSessionHasNoErrors();
+    expect($this->bcp->fresh()->balance)->toBe('3600.00')
+        ->and($this->visa->fresh()->total_balance)->toBe('1300.00');
+
+    Income::latest('id')->first()->delete();
+    expect($this->bcp->fresh()->balance)->toBe('3300.00')
+        ->and($this->visa->fresh()->total_balance)->toBe('1000.00');
+
+    $income(['income_from' => "account:{$this->bcp->id}"])->assertSessionHasErrors('income_from');
+    $foreign = Account::factory()->for(User::factory()->create())->create();
+    $income(['income_from' => "account:{$foreign->id}"])->assertSessionHasErrors('income_from');
+});
+
 it('validates the selections', function () {
     register($this, ['amount' => '10'])->assertSessionHasErrors(['target', 'source']);
 
@@ -152,4 +179,33 @@ it('shows where the money came from in the history', function () {
     $this->actingAs($this->user)->get(route('history.index'))
         ->assertSee('desde Efectivo')
         ->assertSee('con BCP Visa');
+});
+
+it('records a card payment from the commitment screen with the account it comes from', function () {
+    $pay = fn (array $data) => $this->actingAs($this->user)->post(route('commitment-payments.store'), $data + [
+        'commitment_id' => $this->visa->id, 'amount' => '170', 'paid_at' => '2026-10-28',
+    ]);
+
+    $pay(['source' => "account:{$this->bcp->id}"])->assertSessionHasNoErrors();
+    $payment = CommitmentPayment::first();
+    expect($payment->account_id)->toBe($this->bcp->id)
+        ->and($this->bcp->fresh()->balance)->toBe('2830.00')
+        ->and($this->visa->fresh()->total_balance)->toBe('830.00');
+
+    $this->actingAs($this->user)->get(route('commitments.show', $this->visa))->assertSee('Desde BCP Sueldo');
+
+    // Editar sin enviar el origen lo mantiene; cambiarlo mueve el saldo de cuenta.
+    $update = fn (array $data) => $this->actingAs($this->user)->put(route('commitment-payments.update', $payment), $data + [
+        'commitment_id' => $this->visa->id, 'amount' => '170', 'paid_at' => '2026-10-28',
+    ]);
+    $update(['note' => 'recarga'])->assertSessionHasNoErrors();
+    expect($payment->fresh()->account_id)->toBe($this->bcp->id);
+
+    $update(['source' => "account:{$this->cash->id}"])->assertSessionHasNoErrors();
+    expect($this->bcp->fresh()->balance)->toBe('3000.00')
+        ->and($this->cash->fresh()->balance)->toBe('30.00');
+
+    $pay(['source' => "card:{$this->visa->id}"])->assertSessionHasErrors('source');
+    $foreign = Account::factory()->for(User::factory()->create())->create();
+    $pay(['source' => "account:{$foreign->id}"])->assertSessionHasErrors('source');
 });

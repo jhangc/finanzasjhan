@@ -35,7 +35,7 @@ class CommitmentController extends Controller
 
         return view('commitments.show', [
             'commitment' => $commitment,
-            'payments' => $commitment->payments()->with('vouchers')->orderByDesc('paid_at')->orderByDesc('id')->get(),
+            'payments' => $commitment->payments()->with(['vouchers', 'account:id,name', 'paidWith:id,name'])->orderByDesc('paid_at')->orderByDesc('id')->get(),
             'cycle' => $commitment->is_card && $commitment->cut_day ? $cycles->for($commitment) : null,
             'estimate' => $payoff->estimate($commitment),
             'progress' => $progress->for($commitment),

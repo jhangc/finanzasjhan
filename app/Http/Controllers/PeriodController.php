@@ -49,7 +49,7 @@ class PeriodController extends Controller
             'commitments' => $commitments,
             'commitmentsTotal' => Money::sum($commitments->pluck('monthly_amount')),
             'confirmedIncome' => $result?->incomeIsConfirmed ? $result->income : null,
-            'incomes' => $period?->incomes()->orderBy('received_at')->get() ?? collect(),
+            'incomes' => $period?->incomes()->earned()->orderBy('received_at')->get() ?? collect(),
             'previous' => $periods->previous($user, $month->year, $month->month),
             'usdRate' => $user->usd_rate,
         ]);

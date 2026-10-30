@@ -117,7 +117,7 @@
 
         <div class="flex gap-2">
             @if ($commitment->active)
-                <button type="button" class="btn-primary flex-1" @click="paying = @js(['id' => $commitment->id, 'name' => $commitment->name, 'amount' => $statement && ! $statement['outdated'] && ! $statement['paid'] ? $statement['pending'] : \App\Support\Money::of($commitment->monthly_amount)])">Registrar pago</button>
+                <button type="button" class="btn-primary flex-1" @click="paying = @js(['id' => $commitment->id, 'name' => $commitment->name, 'is_card' => $commitment->is_card, 'amount' => $statement && ! $statement['outdated'] && ! $statement['paid'] ? $statement['pending'] : \App\Support\Money::of($commitment->monthly_amount)])">Registrar pago</button>
             @endif
             <button type="button" class="btn-secondary flex-1" @click="editing = !editing">Editar</button>
         </div>
@@ -162,8 +162,9 @@
                         @endif
                         <div class="min-w-0 flex-1">
                             <p class="font-medium">{{ $payment->paid_at->format('d/m/Y') }}</p>
-                            @if ($payment->note)
-                                <p class="truncate text-xs text-slate-500">{{ $payment->note }}</p>
+                            @php($from = $payment->account?->name ?? $payment->paidWith?->name)
+                            @if ($payment->note || $from)
+                                <p class="truncate text-xs text-slate-500">{{ collect([$from ? 'Desde '.$from : null, $payment->note])->filter()->join(' · ') }}</p>
                             @endif
                             @if ($payment->vouchers->isNotEmpty())
                                 <button type="button" class="text-xs font-medium text-emerald-700 hover:underline"
@@ -193,6 +194,7 @@
                                     <input name="note" type="text" class="input bg-white" value="{{ $payment->note }}" maxlength="255">
                                 </x-field>
                             </div>
+                            <x-payment-source :payment="$payment" :cards-disabled="$commitment->is_card ? 'true' : 'false'" />
                             <x-voucher-input :payment="$payment" />
                             <button type="submit" class="btn-primary w-full">Guardar cambios</button>
                         </form>
